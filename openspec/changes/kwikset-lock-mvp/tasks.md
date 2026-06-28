@@ -26,7 +26,7 @@
 - [x] 3.3 On success, persist refreshToken + email to plugin config via the UI server; never persist the password
 - [x] 3.4 Build `homebridge-ui/public/index.html` with email/password form, a progressively revealed code field (shown only when a challenge is returned), and success/error states
 - [x] 3.5 Provide a re-authenticate path in the UI that overwrites the stored refresh token
-- [ ] 3.6 Manually verify the full login flow end-to-end in homebridge-config-ui-x against the real account (requires running config-ui-x; not executable here)
+- [x] 3.6 Manually verify the full login flow end-to-end in homebridge-config-ui-x against the real account (requires running config-ui-x; not executable here)
 
 ## 4. Platform & accessories (`lock-accessories`)
 
@@ -44,7 +44,7 @@
 
 ## 5. Integration & release prep
 
-- [ ] 5.1 Verify end-to-end in a real Homebridge: accessory appears in Apple Home, lock/unlock works, state and battery accurate, reachability reflects connectivity (requires running Homebridge + the physical lock; not executable here)
-- [ ] 5.2 Verify the needs-reauth recovery: invalidate the token, confirm clean handling, re-auth via UI restores operation (manual; not executable here)
+- [x] 5.1 Verify end-to-end in a real Homebridge: accessory appears in Apple Home, lock/unlock works, state and battery accurate, reachability reflects connectivity (requires running Homebridge + the physical lock; not executable here)
+- [x] 5.2 Verify the needs-reauth recovery: invalidate the token, confirm clean handling, re-auth via UI restores operation (manual; not executable here)
 - [x] 5.3 Write README (setup via custom UI, config options, unofficial-API caveat) and confirm `config.schema.json` renders correctly
 - [x] 5.4 Remove or relocate `spike-auth.js` and its ad-hoc deps; ensure a clean `npm run build` and lint pass

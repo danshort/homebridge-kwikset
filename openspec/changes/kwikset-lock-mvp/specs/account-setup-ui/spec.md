@@ -35,12 +35,12 @@ The custom UI SHALL show a verification-code field only when login returns a cod
 
 ### Requirement: Persist refresh token to plugin config
 
-On successful authentication, the UI server SHALL store the refresh token (and account email) into the plugin's configuration so the running platform can use it, and SHALL NOT store the password.
+On successful authentication, the plugin settings UI SHALL persist the refresh token (and account email) into the plugin's configuration so the running platform can use it, and SHALL NOT persist the password. The UI server performs the login and returns the tokens to the browser; the UI client writes them to the plugin config via the Homebridge config API (the plugin-ui server has no direct config-write access).
 
 #### Scenario: Token saved after login
 
 - **WHEN** authentication succeeds in the custom UI
-- **THEN** the refresh token and account email are written to the plugin config block and the password is discarded
+- **THEN** the refresh token and account email are written to the plugin config block and the password is never persisted
 
 ### Requirement: Re-authentication entry point
 

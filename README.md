@@ -14,11 +14,17 @@ It exposes each lock as a HomeKit **Lock** with **battery** reporting, so you ca
 
 ## Installation
 
-Install **homebridge-kwikset** from the Homebridge UI, or:
+In the Homebridge UI, go to **Plugins**, search for **homebridge-kwikset**, and click **Install**. It shows as an *unverified* plugin — that's normal for community plugins; install it anyway.
+
+Or from the Homebridge UI's built-in **Terminal** (or any shell on the Homebridge host):
 
 ```bash
+hb-service add homebridge-kwikset
+# or a plain global install:
 npm install -g homebridge-kwikset
 ```
+
+> Just published and not showing in UI search yet? npm's search index lags new releases by up to a few hours. `hb-service add homebridge-kwikset` installs it immediately by name.
 
 ## Setup
 
@@ -30,6 +36,12 @@ npm install -g homebridge-kwikset
 4. **Restart Homebridge** to apply. Your locks appear as accessories.
 
 If the session ever stops working (e.g. you changed your password), just open the plugin settings and sign in again, then restart Homebridge.
+
+### Recommended: run as a child bridge
+
+Because this plugin depends on a cloud service, running it as a **child bridge** isolates it in its own process — so a slow or failed Kwikset API call can't make your other accessories unresponsive. In the Homebridge UI, open the plugin's **⋮ menu → Bridge Settings**, enable the child bridge, **Save**, and restart. The UI then shows a pairing QR code; add it once in the Home app via **Add Accessory**.
+
+The plugin does **not** enable this automatically: a child bridge needs its own unique bridge username and port, which Homebridge owns, so you turn it on in the UI. Tip — confirm sign-in and that the lock works on the normal bridge first, then enable the child bridge.
 
 ## Configuration
 
