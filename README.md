@@ -1,5 +1,10 @@
 # homebridge-kwikset
 
+[![npm version](https://img.shields.io/npm/v/homebridge-kwikset.svg)](https://www.npmjs.com/package/homebridge-kwikset)
+[![npm downloads](https://img.shields.io/npm/dt/homebridge-kwikset.svg)](https://www.npmjs.com/package/homebridge-kwikset)
+[![CI](https://github.com/danshort/homebridge-kwikset/actions/workflows/ci.yml/badge.svg)](https://github.com/danshort/homebridge-kwikset/actions/workflows/ci.yml)
+[![license](https://img.shields.io/npm/l/homebridge-kwikset.svg)](https://github.com/danshort/homebridge-kwikset/blob/main/LICENSE)
+
 A [Homebridge](https://homebridge.io) plugin that brings **Kwikset Halo** Wi-Fi smart locks into Apple HomeKit, using Kwikset's cloud API.
 
 It exposes each lock as a HomeKit **Lock** with **battery** reporting, so you can lock/unlock and check battery from the Home app and Siri.
@@ -63,7 +68,7 @@ The refresh token is stored in plaintext in the Homebridge config, like all Home
 
 ## Limitations
 
-This MVP covers lock/unlock + battery + reachability via **cloud polling**. Not (yet) included: instant push updates, access-code management, auto-lock/LED/audio toggles, and door-position sensing. State can be up to one poll interval stale for changes made at the keypad.
+This release covers lock/unlock + battery + reachability via **cloud polling**. Not (yet) included: instant push updates, access-code management, auto-lock/LED/audio toggles, and door-position sensing. State can be up to one poll interval stale for changes made at the keypad.
 
 ## Development
 
@@ -74,6 +79,20 @@ npm test           # run the unit test suite (vitest)
 npm run lint
 ```
 
+## Credits
+
+This plugin would not exist without the prior reverse-engineering work of the Home Assistant community. The Kwikset cloud authentication flow and REST endpoints used here were learned from:
+
+- **[explosivo22/kwikset-ha](https://github.com/explosivo22/kwikset-ha)** — the Home Assistant integration for Kwikset locks, which served as the behavioral reference (especially the optimistic lock-state handling).
+- **[aiokwikset](https://pypi.org/project/aiokwikset/)** — the async Python client behind that integration, whose Cognito auth flow and API endpoints this plugin ports to Node.
+
+Many thanks to those maintainers. This is an independent project and is not affiliated with them or with Kwikset.
+
+## Contributing
+
+Issues and pull requests are welcome at [github.com/danshort/homebridge-kwikset](https://github.com/danshort/homebridge-kwikset).
+
 ## License
 
-MIT
+MIT © [Dan Short](https://github.com/danshort)
+
