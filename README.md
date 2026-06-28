@@ -4,6 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dt/homebridge-kwikset.svg)](https://www.npmjs.com/package/homebridge-kwikset)
 [![CI](https://github.com/danshort/homebridge-kwikset/actions/workflows/ci.yml/badge.svg)](https://github.com/danshort/homebridge-kwikset/actions/workflows/ci.yml)
 [![license](https://img.shields.io/npm/l/homebridge-kwikset.svg)](https://github.com/danshort/homebridge-kwikset/blob/main/LICENSE)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support-FFDD00?logo=buymeacoffee&logoColor=black)](https://www.buymeacoffee.com/danshort)
 
 A [Homebridge](https://homebridge.io) plugin that brings **Kwikset Halo** Wi-Fi smart locks into Apple HomeKit, using Kwikset's cloud API.
 
