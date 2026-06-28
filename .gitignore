@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+*.log
+*.tgz
+.DS_Store
+
+# Local Claude Code / OpenSpec tooling (not part of the plugin)
+.claude/
+
+# Throwaway auth exploration script (not part of the plugin)
+spike-auth.js

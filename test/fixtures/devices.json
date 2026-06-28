@@ -1,0 +1,18 @@
+{
+  "data": [
+    {
+      "modelnumber": "HALO-01",
+      "productfamily": "Wi-Fi Lock",
+      "deviceconnectivitystatus": "connected",
+      "sku": "939-00X",
+      "serialnumber": "10aaa9a07a7c3f35de",
+      "firmwareversion": "02.09.10.10",
+      "batterystatus": "Normal Operating State",
+      "batterypercentage": 100,
+      "devicename": "Front Door",
+      "deviceid": "10aaa9a07a7c3f35de",
+      "lockstatus": "Locked"
+    }
+  ],
+  "total": 1
+}

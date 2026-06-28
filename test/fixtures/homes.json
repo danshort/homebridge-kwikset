@@ -1,0 +1,16 @@
+{
+  "data": [
+    {
+      "ownername": "Dan Short",
+      "email": "user@example.com",
+      "createddate": "1703717731",
+      "homeid": "54bdb081-ed79-429b-a8ee-accab83dbc55",
+      "homename": "Casa DAngela",
+      "homedescription": "",
+      "isshared": false,
+      "useraccesslevelstatus": "enabled",
+      "useraccesslevel": "owner"
+    }
+  ],
+  "total": 1
+}
