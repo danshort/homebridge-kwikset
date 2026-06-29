@@ -9,6 +9,8 @@ npm test           # vitest unit suite
 npm run lint
 ```
 
+New to the codebase? Read **[ARCHITECTURE.md](ARCHITECTURE.md)** first — it maps the modules and the key data flows.
+
 ## Branching & PRs
 
 - Work on a branch; open a pull request into `main`.

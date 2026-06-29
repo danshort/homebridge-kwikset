@@ -1,7 +1,9 @@
 /**
- * Pure mapping helpers between Kwikset cloud values and HomeKit semantics.
- * Kept free of `hap-nodejs` imports so they can be unit-tested in isolation;
- * the numeric values match HAP's LockCurrentState / LockTargetState.
+ * Pure domain → HomeKit mapping: lock-state and battery. Kept free of
+ * `hap-nodejs` imports so it can be unit-tested in isolation — the mirrored
+ * enum values are pinned to the real HAP constants by a contract test
+ * (test/stateMapping.contract.test.ts). Cloud-string parsing lives in
+ * `parsing.ts`; this file only maps already-parsed domain values to HomeKit.
  */
 
 import { LockStatus } from './types';
