@@ -22,6 +22,7 @@ import { KwiksetClient } from './client/kwiksetClient';
 import { NeedsReauthError } from './client/errors';
 import { Home, KwiksetDevice, LockAction } from './client/types';
 import { LockAccessory } from './lockAccessory';
+import { writeSessionStatus } from './sessionStatus';
 
 interface KwiksetConfig extends PlatformConfig {
   email?: string;
@@ -103,6 +104,9 @@ export class KwiksetPlatform implements DynamicPlatformPlugin {
   }
 
   private start(): void {
+    // Publish initial health so the setup UI reflects launch state (signed-out
+    // or healthy) before any state transition occurs.
+    this.writeStatus();
     if (this.needsReauth) {
       this.log.warn(
         'No Kwikset session found. Open the plugin settings and sign in; ' +
@@ -112,6 +116,22 @@ export class KwiksetPlatform implements DynamicPlatformPlugin {
       return;
     }
     this.startPolling();
+  }
+
+  /**
+   * Publish current session health to the cross-process status file so the
+   * config-UI server (a separate process) can show a session-expired warning.
+   * Best-effort: a write failure must never disrupt platform operation.
+   */
+  private writeStatus(): void {
+    try {
+      writeSessionStatus(this.api.user.storagePath(), {
+        needsReauth: this.needsReauth,
+        updatedAt: Date.now(),
+      });
+    } catch (err) {
+      this.log.debug(`Could not write session-status file: ${String(err)}`);
+    }
   }
 
   private startPolling(): void {
@@ -242,6 +262,7 @@ export class KwiksetPlatform implements DynamicPlatformPlugin {
     }
     this.needsReauth = true;
     this.stopPolling();
+    this.writeStatus();
     this.startReauthRecheck();
     this.log.error(
       `Kwikset session is no longer valid (${err.message}). Open the plugin settings and sign in again; ` +
@@ -281,6 +302,7 @@ export class KwiksetPlatform implements DynamicPlatformPlugin {
     }
     this.client.restoreSession(session.email, session.refreshToken);
     this.needsReauth = false;
+    this.writeStatus();
     this.stopReauthRecheck();
     this.log.info('Kwikset session restored from updated configuration; resuming.');
     this.startPolling();

@@ -44,8 +44,30 @@ class KwiksetUiServer extends HomebridgePluginUiServer {
 
     this.onRequest('/login', this.handleLogin.bind(this));
     this.onRequest('/submit-code', this.handleSubmitCode.bind(this));
+    this.onRequest('/status', this.handleStatus.bind(this));
 
     this.ready();
+  }
+
+  /**
+   * Report the running platform's live session health (written by the platform
+   * process to a shared status file). Returns `{ needsReauth: false }` whenever
+   * the health can't be determined — missing storage path, unbuilt plugin, or
+   * missing/unreadable status file — so the UI never shows a false "expired"
+   * warning. (The file is trusted as-is; there is no age/TTL check.) Never throws.
+   */
+  async handleStatus() {
+    try {
+      const dir = this.homebridgeStoragePath;
+      if (!dir) {
+        return { needsReauth: false };
+      }
+      const { readSessionStatus } = require('../dist/sessionStatus');
+      const status = readSessionStatus(dir);
+      return { needsReauth: !!(status && status.needsReauth) };
+    } catch (err) {
+      return { needsReauth: false };
+    }
   }
 
   async handleLogin({ email, password } = {}) {

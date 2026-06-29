@@ -17,6 +17,7 @@
     .status.err { background: #fdecea; color: #b71c1c; display: block; }
     .hidden { display: none; }
     .signed-in { background: #e6f4ea; color: #1e7e34; padding: 10px 12px; border-radius: 6px; font-size: 0.9em; }
+    .warn { background: #fff3cd; color: #8a6d00; padding: 10px 12px; border-radius: 6px; font-size: 0.9em; }
     a.link { color: #5468ff; cursor: pointer; font-size: 0.9em; }
   </style>
 </head>
@@ -28,6 +29,10 @@
     <div id="signedIn" class="hidden">
       <div class="signed-in">Signed in as <strong id="signedInEmail"></strong>.</div>
       <p style="margin-top:12px"><a class="link" id="reauthLink">Sign in with a different account / re-authenticate</a></p>
+    </div>
+
+    <div id="sessionExpired" class="hidden">
+      <div class="warn">⚠️ Your Kwikset session for <strong id="expiredEmail"></strong> has expired. Sign in again below to reconnect your locks.</div>
     </div>
 
     <form id="loginForm">
@@ -65,6 +70,8 @@
       const statusEl = document.getElementById('status');
       const signedIn = document.getElementById('signedIn');
       const signedInEmail = document.getElementById('signedInEmail');
+      const sessionExpired = document.getElementById('sessionExpired');
+      const expiredEmail = document.getElementById('expiredEmail');
       const reauthLink = document.getElementById('reauthLink');
 
       let awaitingCode = false;
@@ -79,15 +86,58 @@
         statusEl.textContent = '';
       }
 
-      // Show "already signed in" state if a token is present.
-      async function refreshSignedInState() {
+      // After an in-UI sign-in the platform needs up to its recheck interval
+      // (~60s) to pick up the new token, during which its published status still
+      // reads "expired". Persist a short-lived marker so even a page reload in
+      // that window optimistically shows healthy, avoiding a confusing flash of
+      // "session expired" right after a successful sign-in.
+      const RECENT_SIGNIN_MS = 90000;
+      function markSignedInNow() {
+        try { sessionStorage.setItem('kwikset:signedInAt', String(Date.now())); } catch (e) { /* ignore */ }
+      }
+      function signedInRecently() {
+        try {
+          const t = parseInt(sessionStorage.getItem('kwikset:signedInAt') || '0', 10);
+          return t > 0 && (Date.now() - t) < RECENT_SIGNIN_MS;
+        } catch (e) {
+          return false;
+        }
+      }
+
+      // Reflect the stored token AND the platform's live session health:
+      // a token in config means "signed in at some point", but the running
+      // platform may have had that session rejected — surface that as expired.
+      async function refreshSignedInState(assumeHealthy) {
         const cfg = await homebridge.getPluginConfig();
         const block = cfg[0] || {};
-        if (block.refreshToken && block.email) {
+        if (!(block.refreshToken && block.email)) {
+          signedIn.classList.add('hidden');
+          sessionExpired.classList.add('hidden');
+          return;
+        }
+        // Ask the platform whether the live session is healthy. Unknown/error
+        // is treated as healthy so we never show a false "expired" warning.
+        // We skip the check right after an in-UI sign-in (assumeHealthy) and for
+        // a short window afterward (signedInRecently, survives reloads), since
+        // the platform hasn't picked up the new token yet and would still report
+        // "expired".
+        let needsReauth = false;
+        if (!assumeHealthy && !signedInRecently()) {
+          try {
+            const status = await homebridge.request('/status');
+            needsReauth = !!(status && status.needsReauth);
+          } catch (e) {
+            needsReauth = false;
+          }
+        }
+        if (needsReauth) {
+          expiredEmail.textContent = block.email;
+          sessionExpired.classList.remove('hidden');
+          signedIn.classList.add('hidden');
+        } else {
           signedInEmail.textContent = block.email;
           signedIn.classList.remove('hidden');
-        } else {
-          signedIn.classList.add('hidden');
+          sessionExpired.classList.add('hidden');
         }
       }
 
@@ -132,9 +182,10 @@
       // Shared completion for both the direct-success and code-verified paths.
       async function completeSignIn(res) {
         await persist(res.email, res.refreshToken);
+        markSignedInNow();
         showStatus('Signed in. Restart Homebridge to apply.', true);
         resetForm();
-        await refreshSignedInState();
+        await refreshSignedInState(true);
       }
 
       form.addEventListener('submit', async (e) => {

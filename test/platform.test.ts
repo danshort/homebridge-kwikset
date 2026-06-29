@@ -6,6 +6,7 @@ import { KwiksetPlatform } from '../src/platform';
 import { KwiksetClient } from '../src/client/kwiksetClient';
 import { NeedsReauthError } from '../src/client/errors';
 import { KwiksetDevice, LockStatus } from '../src/client/types';
+import { readSessionStatus } from '../src/sessionStatus';
 import { fakeApi, fakeLog } from './hapStub';
 
 // Fake timers keep the platform's setInterval/setTimeout under control and avoid
@@ -105,6 +106,42 @@ describe('needs-reauth handling', () => {
     const { log, api } = makePlatform({}, { config: { platform: 'Kwikset' } });
     api._handlers['didFinishLaunching']?.();
     expect(log.warn).toHaveBeenCalledWith(expect.stringMatching(/sign in/i));
+  });
+});
+
+describe('session-status file for the UI (#14)', () => {
+  it('publishes healthy on a normal start and flips to needs-reauth on rejection', async () => {
+    const getHomes = vi.fn(async () => {
+      throw new NeedsReauthError('expired');
+    });
+    const { api } = makePlatform({ getHomes });
+
+    api._handlers['didFinishLaunching']?.(); // start() writes healthy, then polls
+    expect(readSessionStatus(api._storagePath)).toMatchObject({ needsReauth: false });
+
+    await vi.advanceTimersByTimeAsync(0); // discovery rejects → enterNeedsReauth writes true
+    expect(readSessionStatus(api._storagePath)).toMatchObject({ needsReauth: true });
+  });
+
+  it('writes needs-reauth at start when no session is configured', () => {
+    const { api } = makePlatform({}, { config: { platform: 'Kwikset' } });
+    api._handlers['didFinishLaunching']?.();
+    expect(readSessionStatus(api._storagePath)).toMatchObject({ needsReauth: true });
+  });
+
+  it('flips back to healthy when the session recovers', async () => {
+    const session: { current: { email?: string; refreshToken?: string } | undefined } = { current: undefined };
+    const { api } = makePlatform(
+      { restoreSession: vi.fn(), getHomes: vi.fn(async () => []), getRefreshToken: () => undefined },
+      { config: { platform: 'Kwikset' }, readPersistedSession: () => session.current },
+    );
+
+    api._handlers['didFinishLaunching']?.();
+    expect(readSessionStatus(api._storagePath)).toMatchObject({ needsReauth: true });
+
+    session.current = { email: 'u@e', refreshToken: 'fresh-token' };
+    await vi.advanceTimersByTimeAsync(60_000); // recheck recovers → writes healthy
+    expect(readSessionStatus(api._storagePath)).toMatchObject({ needsReauth: false });
   });
 });
 
