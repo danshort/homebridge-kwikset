@@ -1,0 +1,58 @@
+name: Release
+
+# release-please watches merges to main and maintains a "release PR" that bumps
+# the version and updates CHANGELOG.md from Conventional Commit messages. Merging
+# that PR creates the tag + GitHub release; the npm-publish job then publishes to
+# the npm registry.
+#
+# Both jobs run in ONE workflow on purpose: a tag/release created by the default
+# GITHUB_TOKEN does NOT trigger a separate workflow (GitHub's loop-prevention),
+# so gating npm-publish on release-please's output (same run) is what makes the
+# publish actually happen.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+
+  npm-publish:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # required for npm provenance
+    steps:
+      - name: Checkout released tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+
+      - name: Publish to npm
+        # prepublishOnly (lint + build) runs automatically as a safety net.
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
