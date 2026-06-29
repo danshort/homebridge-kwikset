@@ -47,7 +47,9 @@ These must be configured once (in **Settings**) before the pipeline can publish:
    - Enable **Allow GitHub Actions to create and approve pull requests** (Release Please opens the release PR).
 2. **npm token** — create an **Automation** access token at npmjs.com (granular token with publish rights to `homebridge-kwikset` also works), then add it as a repository secret named **`NPM_TOKEN`** (*Settings → Secrets and variables → Actions*).
 3. **Squash merge** — *Settings → General → Pull Requests*:
-   - Enable **Allow squash merging**, and set the default squash commit message to **"Pull request title"** so PR titles drive Release Please.
-   - (Recommended) disable merge commits to keep history linear.
+   - Enable **Allow squash merging**, and set the default squash commit message to **"Pull request title and description"** so PR titles drive Release Please.
+   - Merge commits are disabled to keep history linear, and merged branches are auto-deleted.
+
+   > These repo settings (Actions permissions + squash config) are already applied. The remaining step is the `NPM_TOKEN` secret above.
 
 The publish workflow requires a public repository for npm **provenance** (this repo is public) and `id-token: write` on the publish job (already set in `release.yml`).
