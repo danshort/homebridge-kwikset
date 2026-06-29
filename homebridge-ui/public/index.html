@@ -68,6 +68,7 @@
       const reauthLink = document.getElementById('reauthLink');
 
       let awaitingCode = false;
+      let sessionId = null;
 
       function showStatus(msg, ok) {
         statusEl.textContent = msg;
@@ -120,6 +121,7 @@
 
       function resetForm() {
         awaitingCode = false;
+        sessionId = null;
         codeGroup.classList.add('hidden');
         emailEl.disabled = false;
         passwordEl.disabled = false;
@@ -138,6 +140,7 @@
               password: passwordEl.value,
             });
             if (res.status === 'code_required') {
+              sessionId = res.sessionId;
               enterCodeMode(res.email);
             } else {
               await persist(res.email, res.refreshToken);
@@ -146,14 +149,20 @@
               await refreshSignedInState();
             }
           } else {
-            const res = await homebridge.request('/submit-code', { code: codeEl.value.trim() });
+            const res = await homebridge.request('/submit-code', { sessionId, code: codeEl.value.trim() });
             await persist(res.email, res.refreshToken);
             showStatus('Signed in. Restart Homebridge to apply.', true);
             resetForm();
             await refreshSignedInState();
           }
         } catch (err) {
-          showStatus((err && err.message) ? err.message : 'Something went wrong.', false);
+          const message = (err && err.message) ? err.message : 'Something went wrong.';
+          showStatus(message, false);
+          // If the verification session lapsed, return to the password step so
+          // the user can start over (rather than being stuck with a dead code).
+          if (awaitingCode && /start over/i.test(message)) {
+            resetForm();
+          }
         } finally {
           homebridge.hideSpinner();
           submitBtn.disabled = false;

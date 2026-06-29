@@ -64,33 +64,48 @@ function sessionToTokens(session: CognitoUserSession): Tokens {
   };
 }
 
-/** Map a Cognito error during an interactive login to our taxonomy. */
-function mapLoginError(err: unknown): Error {
-  const code = (err as { code?: string; name?: string })?.code ?? (err as { name?: string })?.name ?? '';
-  switch (code) {
+/** Extract a Cognito error's code/name. */
+function cognitoErrorCode(err: unknown): string {
+  const e = err as { code?: string; name?: string } | null | undefined;
+  return e?.code ?? e?.name ?? '';
+}
+
+/** A Cognito error's message, or a fallback. */
+function cognitoMessage(err: unknown, fallback: string): string {
+  return (err as Error)?.message || fallback;
+}
+
+/**
+ * Map a Cognito error during an interactive login to our taxonomy.
+ * Credential failures return a single generic message (do NOT reveal whether
+ * the account exists — that would allow account enumeration via the UI).
+ */
+export function mapLoginError(err: unknown): Error {
+  switch (cognitoErrorCode(err)) {
     case 'NotAuthorizedException':
     case 'UserNotFoundException':
+    case 'InvalidParameterException':
+      return new AuthError('Invalid email or password.');
     case 'CodeMismatchException':
     case 'ExpiredCodeException':
-    case 'InvalidParameterException':
-      return new AuthError((err as Error)?.message || 'Invalid credentials');
+      return new AuthError('Incorrect or expired verification code.');
     case 'NetworkError':
     case 'TimeoutError':
-      return new ConnectionError((err as Error)?.message || 'Network error during authentication');
+      return new ConnectionError(cognitoMessage(err, 'Network error during authentication'));
     default:
-      return new AuthError((err as Error)?.message || 'Authentication failed');
+      return new AuthError('Authentication failed.');
   }
 }
 
 /** Map a Cognito error during a token refresh to our taxonomy. */
-function mapRefreshError(err: unknown): Error {
-  const code = (err as { code?: string; name?: string })?.code ?? (err as { name?: string })?.name ?? '';
+export function mapRefreshError(err: unknown): Error {
+  const code = cognitoErrorCode(err);
   if (code === 'NetworkError' || code === 'TimeoutError') {
-    return new ConnectionError((err as Error)?.message || 'Network error during token refresh');
+    return new ConnectionError(cognitoMessage(err, 'Network error during token refresh'));
   }
   // Anything else on a refresh (NotAuthorized, invalid/expired token) means the
   // session can no longer be restored without a fresh login.
-  return new NeedsReauthError((err as Error)?.message || 'Session expired; re-authentication required');
+  return new NeedsReauthError(cognitoMessage(err, 'Session expired; re-authentication required'));
 }
 
 export class CognitoSrpAuthenticator implements CognitoAuthenticator {
@@ -135,7 +150,14 @@ export class CognitoSrpAuthenticator implements CognitoAuthenticator {
         },
       };
 
-      user.authenticateUser(authDetails, callbacks);
+      // Wrap the synchronous entry point too, so EVERY login failure is routed
+      // through mapLoginError — the single place that guarantees a generic,
+      // non-enumerating message.
+      try {
+        user.authenticateUser(authDetails, callbacks);
+      } catch (err) {
+        reject(mapLoginError(err));
+      }
     });
   }
 
@@ -146,7 +168,11 @@ export class CognitoSrpAuthenticator implements CognitoAuthenticator {
         onFailure: (err) => reject(mapLoginError(err)),
         customChallenge: () => reject(new AuthError('Unexpected additional verification challenge')),
       };
-      resume.user.sendCustomChallengeAnswer(code, callbacks);
+      try {
+        resume.user.sendCustomChallengeAnswer(code, callbacks);
+      } catch (err) {
+        reject(mapLoginError(err));
+      }
     });
   }
 

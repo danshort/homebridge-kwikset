@@ -1,10 +1,4 @@
-# account-setup-ui Specification
-
-## Purpose
-
-Provide a homebridge-config-ui-x custom UI for Kwikset account setup that performs server-side login, handles progressive verification-code challenges, persists the refresh token to plugin config, and supports re-authentication.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Credential entry and server-side login
 
@@ -19,43 +13,6 @@ The plugin SHALL provide a homebridge-config-ui-x custom UI in which the user en
 
 - **WHEN** login fails because the credentials are invalid
 - **THEN** the UI shows a single generic "invalid email or password" error (regardless of whether the account exists) and lets the user try again
-
-### Requirement: Progressive verification-code step
-
-The custom UI SHALL show a verification-code field only when login returns a code challenge, and SHALL complete authentication after the user enters the code.
-
-#### Scenario: Code required
-
-- **WHEN** login returns a verification-code challenge
-- **THEN** the UI reveals a code-entry field and indicates the code has been sent
-
-#### Scenario: No code required
-
-- **WHEN** login returns tokens directly without a challenge
-- **THEN** the UI proceeds to success without showing a code field
-
-#### Scenario: Code submitted
-
-- **WHEN** the user enters the verification code and submits
-- **THEN** the UI server completes the challenge and obtains a refresh token
-
-### Requirement: Persist refresh token to plugin config
-
-On successful authentication, the plugin settings UI SHALL persist the refresh token (and account email) into the plugin's configuration so the running platform can use it, and SHALL NOT persist the password. The UI server performs the login and returns the tokens to the browser; the UI client writes them to the plugin config via the Homebridge config API (the plugin-ui server has no direct config-write access).
-
-#### Scenario: Token saved after login
-
-- **WHEN** authentication succeeds in the custom UI
-- **THEN** the refresh token and account email are written to the plugin config block and the password is never persisted
-
-### Requirement: Re-authentication entry point
-
-The custom UI SHALL allow the user to re-authenticate at any time to replace an invalid or expired refresh token, using the same login flow.
-
-#### Scenario: Re-auth after token expiry
-
-- **WHEN** the stored refresh token is no longer valid and the user opens the custom UI to log in again
-- **THEN** completing the flow overwrites the stored refresh token with a fresh one
 
 ### Requirement: In-progress challenge session continuity
 
