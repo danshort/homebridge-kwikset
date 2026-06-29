@@ -80,6 +80,8 @@ npm test           # run the unit test suite (vitest)
 npm run lint
 ```
 
+See **[ARCHITECTURE.md](ARCHITECTURE.md)** for an orientation to the codebase (the two-process design, module map, and key data flows), and [CONTRIBUTING.md](CONTRIBUTING.md) for the PR/release workflow.
+
 ## Credits
 
 This plugin would not exist without the prior reverse-engineering work of the Home Assistant community. The Kwikset cloud authentication flow and REST endpoints used here were learned from:
