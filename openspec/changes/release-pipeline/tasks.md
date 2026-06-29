@@ -24,6 +24,6 @@
 ## 5. Validation & rollout
 
 - [x] 5.1 Validate workflow YAML and JSON config locally (syntax + `openspec validate`); confirm versions/manifest are consistent with package.json (`0.1.1`)
-- [ ] 5.2 Open this change as a Conventional-Commit-titled PR; confirm `ci.yml` and `pr-title-lint` pass on it
-- [ ] 5.3 After merge, verify Release Please does NOT propose re-releasing `0.1.1` (manifest seeding correct) and that the pipeline is inert until the next `feat`/`fix`
-- [ ] 5.4 Confirm required secrets/settings are in place so the next releasing PR can publish (NPM_TOKEN present, Actions PR permission enabled)
+- [x] 5.2 Open this change as a Conventional-Commit-titled PR; confirm `ci.yml` and `pr-title-lint` pass on it (PR #1: build 18.x/20.x + PR Title all green)
+- [ ] 5.3 After merge, verify Release Please does NOT propose re-releasing `0.1.1` (manifest seeding correct) and that the pipeline is inert until the next `feat`/`fix` (observable only post-merge)
+- [ ] 5.4 Confirm required secrets/settings are in place so the next releasing PR can publish — NPM_TOKEN secret + Actions "create/approve PRs" permission + squash-merge config (manual, repo owner only; documented in CONTRIBUTING.md)
