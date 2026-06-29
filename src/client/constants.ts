@@ -33,3 +33,7 @@ export const MAX_RETRIES = 3;
 export const RETRY_BASE_DELAY_MS = 1_000;
 // Renew the ID token when it is within this window of expiry.
 export const TOKEN_RENEW_SKEW_MS = 5 * 60_000;
+// HTTP statuses worth retrying as transient (vs. 401 = auth, other 4xx = fatal).
+export const RETRYABLE_HTTP_STATUSES: ReadonlySet<number> = new Set([408, 429, 500, 502, 503, 504]);
+// Cap how long we will wait on a 429 Retry-After before falling back to backoff.
+export const MAX_RETRY_AFTER_MS = 30_000;

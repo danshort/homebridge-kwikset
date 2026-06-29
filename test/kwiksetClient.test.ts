@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import devicesFixture from './fixtures/devices.json';
 import { KwiksetClient } from '../src/client/kwiksetClient';
-import { ConnectionError, NeedsReauthError } from '../src/client/errors';
+import { ApiError, ConnectionError, NeedsReauthError } from '../src/client/errors';
 import { LockStatus } from '../src/client/types';
 import { FakeAuthenticator, fakeTokens, makeFakeFetch } from './helpers';
 
@@ -130,5 +130,109 @@ describe('REST operations', () => {
     c.restoreSession('user@example.com', 'r');
 
     await expect(c.getHomes()).rejects.toBeInstanceOf(ConnectionError);
+  });
+});
+
+describe('hardened error handling (#2 403, #5 fresh token, #13 retryable)', () => {
+  it('surfaces 403 as a non-fatal ApiError, does NOT renew, and does NOT latch needs-reauth', async () => {
+    const auth = new FakeAuthenticator();
+    // First request 403s; a later request to the same client still succeeds.
+    const { fetchImpl } = makeFakeFetch([
+      { status: 403 },
+      { status: 200, body: { data: [], total: 0 } },
+    ]);
+    const c = client(auth, fetchImpl);
+    c.restoreSession('user@example.com', 'r');
+
+    await expect(c.getHomes()).rejects.toBeInstanceOf(ApiError);
+    // 403 must not have triggered a token renewal...
+    expect(auth.refreshCalls).toBe(1); // only the initial ensureIdToken renew
+    // ...and the plugin is not bricked: the next request succeeds.
+    await expect(c.getHomes()).resolves.toEqual([]);
+  });
+
+  it('on a 401, renews and retries with the FRESH token (not the rejected one)', async () => {
+    const auth = new FakeAuthenticator();
+    let nonce = 0;
+    let lastRenewedIdToken = '';
+    auth.refreshImpl = async () => {
+      const t = fakeTokens(3600, Date.now(), (nonce += 1)); // distinct token each renew
+      lastRenewedIdToken = t.idToken;
+      return t;
+    };
+    const { fetchImpl, calls } = makeFakeFetch([
+      { status: 401 },
+      { status: 200, body: devicesFixture },
+    ]);
+    const c = client(auth, fetchImpl);
+    c.restoreSession('user@example.com', 'r');
+
+    const devices = await c.getDevices('home-1');
+
+    expect(devices).toHaveLength(1);
+    expect(auth.refreshCalls).toBe(2); // initial + one forced renewal after the 401
+    // The retry must carry the freshly renewed token, not the rejected one.
+    expect(calls[0].headers.Authorization).not.toBe(calls[1].headers.Authorization);
+    expect(calls[1].headers.Authorization).toBe(`Bearer ${lastRenewedIdToken}`);
+  });
+
+  it('tolerates an empty acknowledgement body (e.g. the lock command)', async () => {
+    const auth = new FakeAuthenticator();
+    const { fetchImpl } = makeFakeFetch([{ status: 200 }]); // empty body
+    const c = client(auth, fetchImpl);
+    c.restoreSession('user@example.com', 'r');
+
+    await expect(c.setLockState('SN1', 'unlock')).resolves.toBeUndefined();
+  });
+
+  it('surfaces a malformed JSON body as ApiError (not a raw SyntaxError)', async () => {
+    const auth = new FakeAuthenticator();
+    const { fetchImpl } = makeFakeFetch([{ status: 200, rawBody: '{ not valid json' }]);
+    const c = client(auth, fetchImpl);
+    c.restoreSession('user@example.com', 'r');
+
+    await expect(c.getHomes()).rejects.toBeInstanceOf(ApiError);
+  });
+
+  it('retries a 503 then succeeds', async () => {
+    const auth = new FakeAuthenticator();
+    const { fetchImpl } = makeFakeFetch([
+      { status: 503 },
+      { status: 200, body: devicesFixture },
+    ]);
+    const c = client(auth, fetchImpl);
+    c.restoreSession('user@example.com', 'r');
+
+    await expect(c.getDevices('home-1')).resolves.toHaveLength(1);
+    expect(auth.refreshCalls).toBe(1); // a 5xx must not trigger a token renewal
+  });
+
+  it('gives up with ApiError when a retryable status persists', async () => {
+    const auth = new FakeAuthenticator();
+    const { fetchImpl } = makeFakeFetch([{ status: 503 }]); // repeats
+    const c = client(auth, fetchImpl);
+    c.restoreSession('user@example.com', 'r');
+
+    await expect(c.getHomes()).rejects.toBeInstanceOf(ApiError);
+  });
+
+  it('honors Retry-After on a 429', async () => {
+    const auth = new FakeAuthenticator();
+    const sleeps: number[] = [];
+    const { fetchImpl } = makeFakeFetch([
+      { status: 429, headers: { 'retry-after': '2' } },
+      { status: 200, body: devicesFixture },
+    ]);
+    const c = new KwiksetClient({
+      authenticator: auth,
+      fetchImpl,
+      sleep: async (ms) => {
+        sleeps.push(ms);
+      },
+    });
+    c.restoreSession('user@example.com', 'r');
+
+    await expect(c.getDevices('home-1')).resolves.toHaveLength(1);
+    expect(sleeps).toContain(2000); // waited the Retry-After interval, not the default backoff
   });
 });

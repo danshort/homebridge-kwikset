@@ -55,4 +55,14 @@ describe('parseDevice', () => {
     expect(parseDevice({ deviceid: 'a', batterypercentage: '55' })?.batteryPercentage).toBe(55);
     expect(parseDevice({ deviceid: 'a', batterypercentage: '' })?.batteryPercentage).toBeUndefined();
   });
+
+  it('falls back to doorstatus when lockstatus is an empty string (#8)', () => {
+    const dev = parseDevice({ serialnumber: 'abc', lockstatus: '', doorstatus: 'Locked' });
+    expect(dev?.lockStatus).toBe(LockStatus.Locked);
+  });
+
+  it('falls back to deviceid when serialnumber is an empty string (#8)', () => {
+    const dev = parseDevice({ serialnumber: '   ', deviceid: 'abc', lockstatus: 'Unlocked' });
+    expect(dev?.deviceId).toBe('abc');
+  });
 });

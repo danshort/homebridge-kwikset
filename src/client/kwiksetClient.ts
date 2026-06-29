@@ -9,7 +9,9 @@ import {
   ACCEPT_ENCODING,
   GET_HOMES_URL,
   MAX_RETRIES,
+  MAX_RETRY_AFTER_MS,
   REST_USER_AGENT,
+  RETRYABLE_HTTP_STATUSES,
   RETRY_BASE_DELAY_MS,
   TOKEN_RENEW_SKEW_MS,
   getHomeDevicesUrl,
@@ -105,6 +107,11 @@ export class KwiksetClient {
   restoreSession(email: string, refreshToken: string): void {
     this.email = email;
     this.refreshToken = refreshToken;
+    this.invalidateIdToken();
+  }
+
+  /** Drop the cached ID token so the next request forces a renewal. */
+  private invalidateIdToken(): void {
     this.idToken = undefined;
     this.idTokenExpMs = 0;
   }
@@ -144,6 +151,11 @@ export class KwiksetClient {
 
   private setTokens(tokens: Tokens): void {
     this.idToken = tokens.idToken;
+    // Invariant (#14): Cognito refresh tokens are non-rotating by default, so
+    // this in-memory update is sufficient and the platform need not persist the
+    // refresh token on every renewal. `refreshToken` is only present here on the
+    // initial login/challenge; a renewal returns the same one. If Kwikset ever
+    // enables refresh-token rotation, the platform would need a write-back path.
     if (tokens.refreshToken) {
       this.refreshToken = tokens.refreshToken;
     }
@@ -173,56 +185,102 @@ export class KwiksetClient {
     await this.request('PATCH', lockCommandUrl(serialNumber), payload);
   }
 
-  private async request(method: string, url: string, body?: unknown, isRetryAfterReauth = false): Promise<unknown> {
-    const idToken = await this.ensureIdToken();
-    const headers: Record<string, string> = {
-      Authorization: `Bearer ${idToken}`,
-      'User-Agent': REST_USER_AGENT,
-      'Accept-Encoding': ACCEPT_ENCODING,
-    };
-    if (body !== undefined) {
-      headers['Content-Type'] = 'application/json';
-    }
-
+  private async request(method: string, url: string, body?: unknown): Promise<unknown> {
+    const serializedBody = body !== undefined ? JSON.stringify(body) : undefined;
+    // The single auth renewal (on a 401) is tracked separately from the transient
+    // retry budget, so a 401 never steals a transient slot and a renewed token is
+    // always given its retry. `renewedForAuth` makes a persistent 401 terminal.
+    let transientAttempts = 0;
+    let renewedForAuth = false;
     let lastErr: unknown;
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+
+    for (;;) {
+      // Recompute the token + header every attempt, so a token renewed mid-loop
+      // (after a 401) is never sent stale.
+      const idToken = await this.ensureIdToken();
+      const headers: Record<string, string> = {
+        Authorization: `Bearer ${idToken}`,
+        'User-Agent': REST_USER_AGENT,
+        'Accept-Encoding': ACCEPT_ENCODING,
+      };
+      if (serializedBody !== undefined) {
+        headers['Content-Type'] = 'application/json';
+      }
+
+      let res: Response;
       try {
-        const res = await this.fetchImpl(url, {
-          method,
-          headers,
-          body: body !== undefined ? JSON.stringify(body) : undefined,
-        });
-
-        if (res.status === 401 || res.status === 403) {
-          // Token was rejected. Force one renewal + retry; if it still fails,
-          // the session is no longer valid.
-          if (!isRetryAfterReauth) {
-            this.idToken = undefined;
-            this.idTokenExpMs = 0;
-            await this.renew();
-            return this.request(method, url, body, true);
-          }
-          throw new NeedsReauthError('Authentication rejected by the cloud; please sign in again');
-        }
-
-        if (!res.ok) {
-          throw new ApiError(`Request to ${url} failed with HTTP ${res.status}`, res.status);
-        }
-
-        return await res.json();
+        res = await this.fetchImpl(url, { method, headers, body: serializedBody });
       } catch (err) {
-        if (err instanceof NeedsReauthError || err instanceof ApiError) {
-          throw err;
-        }
-        // Treat anything else (timeouts, connection resets) as transient.
+        // Transport-level failure (timeout, DNS, connection reset): transient.
         lastErr = err;
-        if (attempt < MAX_RETRIES) {
-          this.log(`Transient error on ${url}, retry ${attempt + 1}/${MAX_RETRIES}`);
-          await this.sleep(RETRY_BASE_DELAY_MS * (attempt + 1));
+        if (transientAttempts < MAX_RETRIES) {
+          transientAttempts += 1;
+          this.log(`Transient error on ${url}, retry ${transientAttempts}/${MAX_RETRIES}`);
+          await this.sleep(this.retryDelayMs(transientAttempts));
           continue;
         }
+        throw new ConnectionError(`Request to ${url} failed after ${MAX_RETRIES} retries: ${String(lastErr)}`);
+      }
+
+      // Only 401 means the token was rejected. Renew once, then retry with the
+      // fresh token; a second 401 means the session is genuinely invalid.
+      if (res.status === 401) {
+        if (!renewedForAuth) {
+          renewedForAuth = true;
+          this.invalidateIdToken();
+          await this.renew(); // throws NeedsReauth (bad refresh) or ConnectionError; both propagate
+          continue;
+        }
+        throw new NeedsReauthError('Authentication rejected by the cloud; please sign in again');
+      }
+
+      // Genuinely transient server statuses: retry within the bounded budget.
+      if (RETRYABLE_HTTP_STATUSES.has(res.status)) {
+        if (transientAttempts < MAX_RETRIES) {
+          transientAttempts += 1;
+          this.log(`Retryable HTTP ${res.status} on ${url}, retry ${transientAttempts}/${MAX_RETRIES}`);
+          await this.sleep(this.retryDelayMs(transientAttempts, res));
+          continue;
+        }
+        throw new ApiError(`Request to ${url} failed with HTTP ${res.status} after ${MAX_RETRIES} retries`, res.status);
+      }
+
+      // Any other non-ok status (403, 404, ...) is a non-fatal request error.
+      // Crucially, 403 does NOT latch needs-reauth — it self-heals next request.
+      if (!res.ok) {
+        throw new ApiError(`Request to ${url} failed with HTTP ${res.status}`, res.status);
+      }
+
+      return await this.readBody(res, url);
+    }
+  }
+
+  /** Read a response body as JSON, tolerating an empty body and wrapping parse errors. */
+  private async readBody(res: Response, url: string): Promise<unknown> {
+    const text = await res.text();
+    if (text.trim() === '') {
+      // Some endpoints (e.g. the lock command) acknowledge with an empty body.
+      return null;
+    }
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new ApiError(`Invalid JSON in response from ${url}`, res.status);
+    }
+  }
+
+  /**
+   * Backoff for the given (1-based) attempt. For a 429 response, honor a numeric
+   * `Retry-After` (delta-seconds form only), capped; otherwise linear backoff.
+   */
+  private retryDelayMs(attempt: number, res?: Response): number {
+    if (res?.status === 429) {
+      const header = res.headers?.get?.('retry-after');
+      const seconds = header !== null && header !== undefined ? Number(header) : NaN;
+      if (Number.isFinite(seconds) && seconds >= 0) {
+        return Math.min(seconds * 1000, MAX_RETRY_AFTER_MS);
       }
     }
-    throw new ConnectionError(`Request to ${url} failed after ${MAX_RETRIES} retries: ${String(lastErr)}`);
+    return RETRY_BASE_DELAY_MS * attempt;
   }
 }

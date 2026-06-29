@@ -11,6 +11,16 @@ interface RawEnvelope<T> {
   total?: number;
 }
 
+/** Return the first value that is a non-empty (non-whitespace) string. */
+function firstNonEmptyString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim() !== '') {
+      return value;
+    }
+  }
+  return undefined;
+}
+
 /** Parse the `/users/me/homes` response. */
 export function parseHomes(body: unknown): Home[] {
   const data = (body as RawEnvelope<Record<string, unknown>>)?.data ?? [];
@@ -32,7 +42,8 @@ export function parseDevices(body: unknown): KwiksetDevice[] {
 
 /** Parse a single device record. Returns null if it lacks an identifier. */
 export function parseDevice(raw: Record<string, unknown>): KwiksetDevice | null {
-  const deviceId = (raw.serialnumber ?? raw.deviceid) as string | undefined;
+  // Treat empty strings as absent so a blank serialnumber falls back to deviceid.
+  const deviceId = firstNonEmptyString(raw.serialnumber, raw.deviceid);
   if (!deviceId) {
     return null;
   }
@@ -47,10 +58,10 @@ export function parseDevice(raw: Record<string, unknown>): KwiksetDevice | null 
   const connectivity = raw.deviceconnectivitystatus as string | undefined;
 
   return {
-    deviceId: String(deviceId),
-    name: typeof raw.devicename === 'string' && raw.devicename ? raw.devicename : String(deviceId),
+    deviceId,
+    name: typeof raw.devicename === 'string' && raw.devicename ? raw.devicename : deviceId,
     // List endpoint uses `lockstatus`; detail endpoint uses `doorstatus`.
-    lockStatus: parseLockStatus((raw.lockstatus ?? raw.doorstatus) as string | undefined),
+    lockStatus: parseLockStatus(firstNonEmptyString(raw.lockstatus, raw.doorstatus)),
     batteryPercentage: battery !== undefined && !Number.isNaN(battery) ? battery : undefined,
     online: isConnected(connectivity),
     modelNumber: typeof raw.modelnumber === 'string' ? raw.modelnumber : undefined,
