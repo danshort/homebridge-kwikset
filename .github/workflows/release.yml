@@ -2,13 +2,16 @@ name: Release
 
 # release-please watches merges to main and maintains a "release PR" that bumps
 # the version and updates CHANGELOG.md from Conventional Commit messages. Merging
-# that PR creates the tag + GitHub release; the npm-publish job then publishes to
-# the npm registry.
+# that PR creates the tag + GitHub release; the publish job then publishes to npm.
 #
-# Both jobs run in ONE workflow on purpose: a tag/release created by the default
+# All jobs run in ONE workflow on purpose: a tag/release created by the default
 # GITHUB_TOKEN does NOT trigger a separate workflow (GitHub's loop-prevention),
-# so gating npm-publish on release-please's output (same run) is what makes the
-# publish actually happen.
+# so gating on release-please's output (same run) is what makes the publish happen.
+#
+# Supply-chain hardening: build/lint/test run in an UNPRIVILEGED `build` job (no
+# id-token). The `npm-publish` job holds id-token: write but runs no untrusted
+# code — it only downloads the built artifact and `npm publish --ignore-scripts`.
+# Third-party Actions are pinned to commit SHAs so a moved tag can't inject code.
 
 on:
   push:
@@ -25,11 +28,37 @@ jobs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4
         id: release
 
-  npm-publish:
+  # Unprivileged build + test (no id-token). Produces the dist/ artifact the
+  # publish job consumes, so no untrusted code runs while the OIDC token exists.
+  build:
     needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - run: npm test
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dist
+          path: dist
+          retention-days: 1
+
+  npm-publish:
+    needs: [release-please, build]
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     # Must match the Environment configured on the npm Trusted Publisher.
@@ -38,28 +67,23 @@ jobs:
       contents: read
       id-token: write # OIDC for npm Trusted Publishing (no token; auto provenance)
     steps:
-      - name: Checkout released tag
-        uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           ref: ${{ needs.release-please.outputs.tag_name }}
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
-          cache: npm
-
-      - run: npm ci
-      - run: npm test
-
-      # Trusted Publishing authenticates via GitHub OIDC — no NPM_TOKEN secret.
-      # It requires a recent npm (>= 11.5.1); setup-node may ship an older one.
-      - name: Update npm for Trusted Publishing
-        run: npm install -g npm@latest
-
-      - name: Publish to npm (Trusted Publishing)
-        # No token: npm exchanges the OIDC id-token for short-lived publish
-        # credentials. Provenance attestations are generated automatically.
-        # prepublishOnly (lint + build) runs as a safety net.
-        run: npm publish --access public
+      # The dist/ built by the unprivileged job; this job never builds it itself.
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: dist
+          path: dist
+      # Trusted Publishing needs npm >= 11.5.1; setup-node ships an older one.
+      # Pin the version (not @latest) so the only code fetched in this privileged
+      # job is a known, reproducible npm. Bump deliberately when needed.
+      - run: npm install -g npm@11.5.1
+      # --ignore-scripts: do NOT run prepublishOnly (lint/build) or any dependency
+      # lifecycle scripts while holding id-token — the build job already did that.
+      # Provenance is still generated automatically under OIDC.
+      - run: npm publish --ignore-scripts --access public
