@@ -45,11 +45,16 @@ These must be configured once (in **Settings**) before the pipeline can publish:
 1. **Actions permissions** — *Settings → Actions → General → Workflow permissions*:
    - Select **Read and write permissions**.
    - Enable **Allow GitHub Actions to create and approve pull requests** (Release Please opens the release PR).
-2. **npm token** — create an **Automation** access token at npmjs.com (granular token with publish rights to `homebridge-kwikset` also works), then add it as a repository secret named **`NPM_TOKEN`** (*Settings → Secrets and variables → Actions*).
+2. **npm Trusted Publishing** — on [npmjs.com](https://www.npmjs.com/package/homebridge-kwikset), open the **homebridge-kwikset** package → **Settings → Trusted Publishing** → add a **GitHub Actions** publisher:
+   - Repository owner / repo: `danshort/homebridge-kwikset`
+   - Workflow filename: `release.yml`
+   - Environment name: `release` (matches the `environment: release` on the publish job; the GitHub environment already exists)
+
+   No token or secret is stored — CI authenticates via GitHub OIDC and short-lived credentials, and you can **keep 2FA enabled**. (npm now steers automation away from long-lived automation tokens toward Trusted Publishing.)
 3. **Squash merge** — *Settings → General → Pull Requests*:
    - Enable **Allow squash merging**, and set the default squash commit message to **"Pull request title and description"** so PR titles drive Release Please.
    - Merge commits are disabled to keep history linear, and merged branches are auto-deleted.
 
-   > These repo settings (Actions permissions + squash config) are already applied. The remaining step is the `NPM_TOKEN` secret above.
+   > The repo settings (Actions permissions + squash config) are already applied. The remaining step is configuring the **Trusted Publisher** on npm (step 2).
 
-The publish workflow requires a public repository for npm **provenance** (this repo is public) and `id-token: write` on the publish job (already set in `release.yml`).
+Trusted Publishing (and the automatic **provenance** attestation) requires a public repository — this repo is public — and `id-token: write` on the publish job, which is already set in `release.yml`.

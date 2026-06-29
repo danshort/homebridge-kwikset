@@ -8,7 +8,7 @@
 - [x] 2.1 Add `.github/workflows/release.yml` triggered on push to `main` with `contents: write` + `pull-requests: write`
 - [x] 2.2 Add the `release-please` job (googleapis/release-please-action@v4) exposing `release_created` and `tag_name` outputs
 - [x] 2.3 Add the `npm-publish` job: `needs` release-please, `if: release_created == 'true'`, checks out `tag_name`, `permissions: id-token: write` + `contents: read`
-- [x] 2.4 In the publish job, set up Node 20 with `registry-url` (npm registry), `npm ci`, run the test suite, then `npm publish --provenance --access public` with `NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}`
+- [x] 2.4 In the publish job, set up Node 20 with `registry-url` (npm registry), `npm ci`, run the test suite, upgrade npm (Trusted Publishing needs ≥ 11.5.1), then `npm publish --access public` authenticated via npm Trusted Publishing (GitHub OIDC, no token); job runs in the `release` environment to match the npm Trusted Publisher config
 - [x] 2.5 Add a header comment explaining the same-run gating (default token doesn't trigger downstream release workflows)
 
 ## 3. PR title enforcement
@@ -26,4 +26,4 @@
 - [x] 5.1 Validate workflow YAML and JSON config locally (syntax + `openspec validate`); confirm versions/manifest are consistent with package.json (`0.1.1`)
 - [x] 5.2 Open this change as a Conventional-Commit-titled PR; confirm `ci.yml` and `pr-title-lint` pass on it (PR #1: build 18.x/20.x + PR Title all green)
 - [ ] 5.3 After merge, verify Release Please does NOT propose re-releasing `0.1.1` (manifest seeding correct) and that the pipeline is inert until the next `feat`/`fix` (observable only post-merge)
-- [ ] 5.4 Confirm required secrets/settings are in place so the next releasing PR can publish — NPM_TOKEN secret + Actions "create/approve PRs" permission + squash-merge config (manual, repo owner only; documented in CONTRIBUTING.md)
+- [x] 5.4 Confirm required settings are in place so the next releasing PR can publish — npm Trusted Publisher configured (repo + `release.yml` + `release` env), Actions "create/approve PRs" permission enabled, squash-merge config applied

@@ -25,21 +25,21 @@ Merging the release pull request SHALL create a git tag and a GitHub Release for
 
 ### Requirement: Automated npm publish gated on the release
 
-When (and only when) a release is created, the pipeline SHALL publish the package to npm from CI, checking out the released tag and publishing with provenance and public access. The publish job SHALL run in the same workflow run as the release so it is not skipped by the default token not triggering downstream workflows.
+When (and only when) a release is created, the pipeline SHALL publish the package to npm from CI using npm Trusted Publishing (GitHub OIDC, no stored token), checking out the released tag and publishing with public access and automatic provenance. The publish job SHALL run in the same workflow run as the release so it is not skipped by the default token not triggering downstream workflows.
 
 #### Scenario: Release created
 
 - **WHEN** the release job reports that a release was created
-- **THEN** the publish job checks out the released tag, installs dependencies, and runs `npm publish` with provenance and public access
+- **THEN** the publish job checks out the released tag, installs dependencies, and runs `npm publish` authenticated via OIDC, producing a public, provenance-signed release
 
 #### Scenario: No release created
 
 - **WHEN** a push to `main` does not result in a release (only the release PR is updated, or nothing changes)
 - **THEN** the publish job does not run
 
-#### Scenario: Missing publish credentials
+#### Scenario: Trusted publisher not configured
 
-- **WHEN** the `NPM_TOKEN` secret is absent or invalid
+- **WHEN** the npm Trusted Publisher for this repository/workflow is not configured (or OIDC is unavailable)
 - **THEN** the publish step fails clearly without producing a partial or unauthenticated publish
 
 ### Requirement: Conventional Commit PR titles enforced
@@ -76,7 +76,7 @@ The existing lint/build/test CI SHALL continue to run on pull requests and pushe
 
 ### Requirement: Documented release operating procedure
 
-The repository SHALL document the one-time setup (Actions PR permissions, `NPM_TOKEN` secret, squash-merge configuration) and the day-to-day release flow so a maintainer can operate and reproduce releases.
+The repository SHALL document the one-time setup (Actions PR permissions, npm Trusted Publisher configuration, squash-merge configuration) and the day-to-day release flow so a maintainer can operate and reproduce releases.
 
 #### Scenario: Maintainer sets up releasing
 

@@ -11,7 +11,7 @@ Releasing `homebridge-kwikset` is currently manual: bump the version by hand, ta
 - Add `.github/workflows/release.yml` (release-please job + gated npm-publish job).
 - Add `.github/workflows/pr-title-lint.yml` enforcing Conventional Commit PR titles.
 - Add `release-please-config.json` and `.release-please-manifest.json` (seeded at the current `0.1.1`).
-- Document the required one-time repo configuration (Actions PR permissions, `NPM_TOKEN` secret, squash-merge settings) in the README/contributing notes.
+- Document the required one-time repo configuration (Actions PR permissions, npm Trusted Publisher, squash-merge settings) in the README/contributing notes.
 - The existing `.github/workflows/ci.yml` (lint + build + tests) is retained unchanged as the PR gate; the manual `prepublishOnly` script remains as a safety net.
 
 ## Capabilities
@@ -26,7 +26,7 @@ Releasing `homebridge-kwikset` is currently manual: bump the version by hand, ta
 
 - **New files**: `.github/workflows/release.yml`, `.github/workflows/pr-title-lint.yml`, `release-please-config.json`, `.release-please-manifest.json`, and (auto-generated on first release) `CHANGELOG.md`.
 - **CI actions used**: `googleapis/release-please-action@v4`, `amannn/action-semantic-pull-request@v5`, `actions/setup-node`, `actions/checkout`.
-- **Secrets / settings (manual, one-time)**: `NPM_TOKEN` automation token; Actions workflow permissions set to read/write with "allow GitHub Actions to create and approve pull requests"; squash-merge enabled with the PR title as the squash subject. The pipeline cannot publish until `NPM_TOKEN` exists.
+- **Settings (manual, one-time)**: an npm **Trusted Publisher** on the package (repo + `release.yml` + `release` environment) — no stored token, 2FA stays on; Actions workflow permissions set to read/write with "allow GitHub Actions to create and approve pull requests"; squash-merge enabled with the PR title as the squash subject. The pipeline cannot publish until the Trusted Publisher is configured.
 - **Process change**: direct pushes to `main` are replaced by branch → PR → squash-merge; version is no longer hand-edited (release-please owns `package.json` version + manifest).
-- **Provenance**: requires the public repo (already public) and `id-token: write` on the publish job.
+- **Trusted Publishing / provenance**: requires the public repo (already public), `id-token: write`, a recent npm (≥ 11.5.1, installed in the job), and a GitHub `release` environment on the publish job.
 - **Out of scope**: plugin runtime code, package signing beyond npm provenance, and any non-npm distribution channel.

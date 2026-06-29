@@ -32,9 +32,11 @@ jobs:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
+    # Must match the Environment configured on the npm Trusted Publisher.
+    environment: release
     permissions:
       contents: read
-      id-token: write # required for npm provenance
+      id-token: write # OIDC for npm Trusted Publishing (no token; auto provenance)
     steps:
       - name: Checkout released tag
         uses: actions/checkout@v4
@@ -51,8 +53,13 @@ jobs:
       - run: npm ci
       - run: npm test
 
-      - name: Publish to npm
-        # prepublishOnly (lint + build) runs automatically as a safety net.
-        run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # Trusted Publishing authenticates via GitHub OIDC — no NPM_TOKEN secret.
+      # It requires a recent npm (>= 11.5.1); setup-node may ship an older one.
+      - name: Update npm for Trusted Publishing
+        run: npm install -g npm@latest
+
+      - name: Publish to npm (Trusted Publishing)
+        # No token: npm exchanges the OIDC id-token for short-lived publish
+        # credentials. Provenance attestations are generated automatically.
+        # prepublishOnly (lint + build) runs as a safety net.
+        run: npm publish --access public
