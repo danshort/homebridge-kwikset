@@ -91,7 +91,7 @@ Many thanks to those maintainers. This is an independent project and is not affi
 
 ## Contributing
 
-Issues and pull requests are welcome at [github.com/danshort/homebridge-kwikset](https://github.com/danshort/homebridge-kwikset).
+Issues and pull requests are welcome at [github.com/danshort/homebridge-kwikset](https://github.com/danshort/homebridge-kwikset). See [CONTRIBUTING.md](CONTRIBUTING.md) for the development setup, Conventional Commit PR titles, and the automated (Release Please → npm) release process.
 
 ## License
 
