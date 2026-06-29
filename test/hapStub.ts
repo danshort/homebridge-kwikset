@@ -2,7 +2,19 @@
  * Minimal HAP/Homebridge fakes — just enough surface for the accessory and
  * platform to run under vitest without hap-nodejs or a real Homebridge.
  */
-import { vi } from 'vitest';
+import { mkdtempSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
+import { afterAll, vi } from 'vitest';
+
+// Temp storage dirs created by fakeApi(); cleaned up after each importing suite.
+const createdStorageDirs: string[] = [];
+afterAll(() => {
+  for (const dir of createdStorageDirs) {
+    rmSync(dir, { recursive: true, force: true });
+  }
+  createdStorageDirs.length = 0;
+});
 
 // Characteristic identities double as map keys and carry their enum constants.
 export const Characteristic = {
@@ -88,13 +100,17 @@ export function fakeLog() {
 /** A fake Homebridge `API` sufficient for KwiksetPlatform construction. */
 export function fakeApi(configPath = '/nonexistent/config.json') {
   const handlers: Record<string, () => void> = {};
+  // Real, writable temp dir so the platform's session-status writes exercise the
+  // actual filesystem path instead of being swallowed by the best-effort catch.
+  const storagePath = mkdtempSync(join(tmpdir(), 'kwikset-stub-'));
+  createdStorageDirs.push(storagePath);
   return {
     hap: {
       Service,
       Characteristic,
       uuid: { generate: (s: string) => `uuid-${s}` },
     },
-    user: { configPath: () => configPath },
+    user: { configPath: () => configPath, storagePath: () => storagePath },
     platformAccessory: FakeAccessory,
     on: (event: string, cb: () => void) => {
       handlers[event] = cb;
@@ -102,5 +118,6 @@ export function fakeApi(configPath = '/nonexistent/config.json') {
     registerPlatformAccessories: vi.fn(),
     unregisterPlatformAccessories: vi.fn(),
     _handlers: handlers,
+    _storagePath: storagePath,
   };
 }
