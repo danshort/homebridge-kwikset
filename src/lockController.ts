@@ -31,10 +31,15 @@ export interface LockControllerDeps {
   log?: (msg: string) => void;
 }
 
+interface PendingCommand {
+  target: LockTargetState;
+  handle: TimerHandle;
+}
+
 export class LockController {
   private current: LockCurrentState = LockCurrentState.UNKNOWN;
   private target: LockTargetState = LockTargetState.SECURED;
-  private pending?: { target: LockTargetState; handle: TimerHandle };
+  private pending?: PendingCommand;
 
   private readonly setTimer: (fn: () => void, ms: number) => TimerHandle;
   private readonly clearTimer: (handle: TimerHandle) => void;
@@ -81,25 +86,32 @@ export class LockController {
     if (this.pending) {
       this.clearTimer(this.pending.handle);
     }
-    this.pending = {
+    // Capture this call's own pending record. A later requestTarget can replace
+    // `this.pending`; rollback below must only act if THIS command is still it.
+    const pending: PendingCommand = {
       target,
-      handle: this.setTimer(() => this.onTimeout(), this.deps.timeoutMs),
+      handle: this.setTimer(() => this.onTimeout(pending), this.deps.timeoutMs),
     };
+    this.pending = pending;
 
     const action: LockAction = target === LockTargetState.SECURED ? 'lock' : 'unlock';
     try {
       await this.deps.sendCommand(action);
     } catch (err) {
-      // The command failed to even send: drop the optimistic state.
-      this.clearPending();
-      this.target = this.currentAsTarget();
-      this.emit();
+      // The command failed to send. Only roll back if a newer command hasn't
+      // superseded this one in the meantime.
+      if (this.pending === pending) {
+        this.clearPending();
+        this.target = this.currentAsTarget();
+        this.emit();
+      }
       throw err;
     }
   }
 
-  private onTimeout(): void {
-    if (!this.pending) {
+  private onTimeout(pending: PendingCommand): void {
+    // Ignore a stale timer from a command that was confirmed or superseded.
+    if (this.pending !== pending) {
       return;
     }
     this.log('Lock command was not confirmed in time; reverting to last known state');

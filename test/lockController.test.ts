@@ -121,3 +121,65 @@ describe('LockController optimistic command flow', () => {
     expect(h.hasTimer()).toBe(false);
   });
 });
+
+describe('LockController overlapping commands (#4)', () => {
+  it('an earlier command failing does not clobber a newer in-flight command', async () => {
+    let timerFn: (() => void) | undefined;
+    const sends: Array<{ resolve: () => void; reject: (e: unknown) => void }> = [];
+    const controller = new LockController({
+      timeoutMs: 1000,
+      sendCommand: () =>
+        new Promise<void>((resolve, reject) => {
+          sends.push({ resolve, reject });
+        }),
+      onChange: () => undefined,
+      setTimer: (fn) => {
+        timerFn = fn;
+        return {};
+      },
+      clearTimer: () => {
+        timerFn = undefined;
+      },
+    });
+
+    controller.setFromPoll(LockStatus.Locked); // current SECURED
+    const first = controller.requestTarget(LockTargetState.UNSECURED); // command A
+    const second = controller.requestTarget(LockTargetState.UNSECURED); // command B supersedes A
+
+    sends[0].reject(new Error('send failed')); // A fails while B is still in flight
+    await expect(first).rejects.toThrow('send failed');
+
+    // B's optimistic state must be intact — not clobbered by A's failure.
+    expect(controller.snapshot.target).toBe(LockTargetState.UNSECURED);
+    expect(timerFn).toBeDefined();
+
+    sends[1].resolve();
+    await second;
+    controller.setFromPoll(LockStatus.Unlocked); // B confirms
+    expect(controller.snapshot.current).toBe(LockCurrentState.UNSECURED);
+    expect(controller.snapshot.target).toBe(LockTargetState.UNSECURED);
+  });
+
+  it('a stale superseded timer does not revert the current command', () => {
+    let staleTimer: (() => void) | undefined;
+    const controller = new LockController({
+      timeoutMs: 1000,
+      sendCommand: async () => undefined,
+      onChange: () => undefined,
+      // Capture the first command's timer; deliberately do not clear timers so
+      // the superseded one can still fire.
+      setTimer: (fn) => {
+        staleTimer ??= fn;
+        return {};
+      },
+      clearTimer: () => undefined,
+    });
+
+    controller.setFromPoll(LockStatus.Locked); // SECURED
+    void controller.requestTarget(LockTargetState.UNSECURED); // command A → staleTimer
+    void controller.requestTarget(LockTargetState.UNSECURED); // command B supersedes A
+
+    staleTimer?.(); // A's stale timeout fires
+    expect(controller.snapshot.target).toBe(LockTargetState.UNSECURED); // B not reverted
+  });
+});
