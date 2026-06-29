@@ -236,3 +236,40 @@ describe('hardened error handling (#2 403, #5 fresh token, #13 retryable)', () =
     expect(sleeps).toContain(2000); // waited the Retry-After interval, not the default backoff
   });
 });
+
+describe('token lifecycle edge cases (#17)', () => {
+  it('rejects submitCode when no verification challenge is in progress', async () => {
+    const c = new KwiksetClient({ authenticator: new FakeAuthenticator(), sleep: noSleep });
+    await expect(c.submitCode('123456')).rejects.toBeInstanceOf(ApiError);
+  });
+
+  it('renews the token once it is within the expiry skew window', async () => {
+    const auth = new FakeAuthenticator();
+    let t = 0;
+    auth.refreshImpl = async () => fakeTokens(3600, t); // exp ≈ t + 3600s
+    const { fetchImpl } = makeFakeFetch([{ status: 200, body: { data: [] } }]);
+    const c = new KwiksetClient({ authenticator: auth, fetchImpl, now: () => t, sleep: noSleep });
+    c.restoreSession('user@example.com', 'r');
+
+    await c.getHomes();
+    expect(auth.refreshCalls).toBe(1); // initial renewal
+    await c.getHomes();
+    expect(auth.refreshCalls).toBe(1); // still fresh — no renewal
+
+    t = 3_300_001; // within the 5-minute skew of the ~3600s expiry
+    await c.getHomes();
+    expect(auth.refreshCalls).toBe(2); // renewed proactively
+  });
+
+  it('treats a token with an undecodable exp as expired (renews each request)', async () => {
+    const auth = new FakeAuthenticator();
+    auth.refreshImpl = async () => ({ idToken: 'not-a-jwt', accessToken: 'x', refreshToken: 'r' });
+    const { fetchImpl } = makeFakeFetch([{ status: 200, body: { data: [] } }]);
+    const c = new KwiksetClient({ authenticator: auth, fetchImpl, now: () => 1000, sleep: noSleep });
+    c.restoreSession('user@example.com', 'r');
+
+    await c.getHomes();
+    await c.getHomes();
+    expect(auth.refreshCalls).toBe(2); // exp decodes to 0 → always "expired"
+  });
+});
