@@ -112,7 +112,7 @@
       function enterCodeMode(email) {
         awaitingCode = true;
         codeGroup.classList.remove('hidden');
-        passwordEl.parentElement && (passwordEl.disabled = true);
+        passwordEl.disabled = true;
         emailEl.disabled = true;
         submitBtn.textContent = 'Verify Code';
         showStatus('A verification code was sent to ' + email + '. Enter it above.', true);
@@ -129,6 +129,14 @@
         submitBtn.textContent = 'Sign In';
       }
 
+      // Shared completion for both the direct-success and code-verified paths.
+      async function completeSignIn(res) {
+        await persist(res.email, res.refreshToken);
+        showStatus('Signed in. Restart Homebridge to apply.', true);
+        resetForm();
+        await refreshSignedInState();
+      }
+
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
         submitBtn.disabled = true;
@@ -143,17 +151,11 @@
               sessionId = res.sessionId;
               enterCodeMode(res.email);
             } else {
-              await persist(res.email, res.refreshToken);
-              showStatus('Signed in. Restart Homebridge to apply.', true);
-              resetForm();
-              await refreshSignedInState();
+              await completeSignIn(res);
             }
           } else {
             const res = await homebridge.request('/submit-code', { sessionId, code: codeEl.value.trim() });
-            await persist(res.email, res.refreshToken);
-            showStatus('Signed in. Restart Homebridge to apply.', true);
-            resetForm();
-            await refreshSignedInState();
+            await completeSignIn(res);
           }
         } catch (err) {
           const message = (err && err.message) ? err.message : 'Something went wrong.';

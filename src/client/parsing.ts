@@ -3,12 +3,33 @@
  * client so they can be unit-tested against recorded fixtures.
  */
 
-import { Home, KwiksetDevice } from './types';
-import { isConnected, parseLockStatus } from './stateMapping';
+import { Home, KwiksetDevice, LockStatus } from './types';
 
 interface RawEnvelope<T> {
   data?: T[];
   total?: number;
+}
+
+/**
+ * Parse the cloud `lockstatus` string into a canonical LockStatus,
+ * case-insensitively. Unrecognized values become `Unknown`.
+ */
+export function parseLockStatus(raw: string | undefined | null): LockStatus {
+  switch ((raw ?? '').trim().toLowerCase()) {
+    case 'locked':
+      return LockStatus.Locked;
+    case 'unlocked':
+      return LockStatus.Unlocked;
+    case 'jammed':
+      return LockStatus.Jammed;
+    default:
+      return LockStatus.Unknown;
+  }
+}
+
+/** Interpret the cloud connectivity string as online/offline. */
+export function isConnected(rawConnectivity: string | undefined | null): boolean {
+  return (rawConnectivity ?? '').trim().toLowerCase() === 'connected';
 }
 
 /** Return the first value that is a non-empty (non-whitespace) string. */

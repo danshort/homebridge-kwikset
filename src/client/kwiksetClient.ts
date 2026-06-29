@@ -13,6 +13,8 @@ import {
   REST_USER_AGENT,
   RETRYABLE_HTTP_STATUSES,
   RETRY_BASE_DELAY_MS,
+  SOURCE_DEVICE,
+  SOURCE_NAME_MAX_LEN,
   TOKEN_RENEW_SKEW_MS,
   getHomeDevicesUrl,
   lockCommandUrl,
@@ -46,7 +48,8 @@ const defaultSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 function decodeJwtExpMs(jwt: string): number {
   try {
     const payload = jwt.split('.')[1];
-    const json = Buffer.from(payload, 'base64').toString('utf8');
+    // JWT segments are base64url-encoded.
+    const json = Buffer.from(payload, 'base64url').toString('utf8');
     const exp = JSON.parse(json).exp;
     return typeof exp === 'number' ? exp * 1000 : 0;
   } catch {
@@ -180,7 +183,7 @@ export class KwiksetClient {
   async setLockState(serialNumber: string, action: LockAction, sourceName = 'HomeKit'): Promise<void> {
     const payload = {
       action,
-      source: JSON.stringify({ name: sourceName.slice(0, 7), device: 'apikwik' }),
+      source: JSON.stringify({ name: sourceName.slice(0, SOURCE_NAME_MAX_LEN), device: SOURCE_DEVICE }),
     };
     await this.request('PATCH', lockCommandUrl(serialNumber), payload);
   }

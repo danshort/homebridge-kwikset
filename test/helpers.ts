@@ -8,8 +8,9 @@ import { Tokens } from '../src/client/types';
  */
 export function fakeJwt(secondsFromNow: number, nowMs = Date.now(), nonce?: number): string {
   const exp = Math.floor(nowMs / 1000) + secondsFromNow;
-  const header = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64');
-  const payload = Buffer.from(JSON.stringify(nonce === undefined ? { exp } : { exp, nonce })).toString('base64');
+  // Real JWT segments are base64url; match that so decodeJwtExpMs decodes them.
+  const header = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url');
+  const payload = Buffer.from(JSON.stringify(nonce === undefined ? { exp } : { exp, nonce })).toString('base64url');
   return `${header}.${payload}.sig`;
 }
 

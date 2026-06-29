@@ -20,23 +20,6 @@ export enum LockTargetState {
   SECURED = 1,
 }
 
-/**
- * Parse the cloud `lockstatus` string into a canonical LockStatus,
- * case-insensitively. Unrecognized values become `Unknown`.
- */
-export function parseLockStatus(raw: string | undefined | null): LockStatus {
-  switch ((raw ?? '').trim().toLowerCase()) {
-    case 'locked':
-      return LockStatus.Locked;
-    case 'unlocked':
-      return LockStatus.Unlocked;
-    case 'jammed':
-      return LockStatus.Jammed;
-    default:
-      return LockStatus.Unknown;
-  }
-}
-
 /** Map a canonical LockStatus to the HomeKit current-state value. */
 export function toHomeKitCurrentState(status: LockStatus): LockCurrentState {
   switch (status) {
@@ -60,9 +43,4 @@ export function isLowBattery(percentage: number | undefined, threshold: number):
     return false;
   }
   return percentage <= threshold;
-}
-
-/** Interpret the cloud connectivity string as online/offline. */
-export function isConnected(rawConnectivity: string | undefined | null): boolean {
-  return (rawConnectivity ?? '').trim().toLowerCase() === 'connected';
 }

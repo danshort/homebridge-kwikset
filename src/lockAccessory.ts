@@ -15,6 +15,7 @@ export class LockAccessory {
   private readonly lockService: Service;
   private readonly batteryService: Service;
   private readonly controller: LockController;
+  private readonly C: KwiksetPlatform['hap']['Characteristic'];
   private offline = false;
 
   constructor(
@@ -23,6 +24,7 @@ export class LockAccessory {
     private device: KwiksetDevice,
   ) {
     const { Service, Characteristic } = this.platform.hap;
+    this.C = Characteristic;
 
     this.accessory.getService(Service.AccessoryInformation)!
       .setCharacteristic(Characteristic.Manufacturer, 'Kwikset')
@@ -68,7 +70,6 @@ export class LockAccessory {
   /** Apply a fresh device snapshot from a poll. */
   update(device: KwiksetDevice): void {
     this.device = device;
-    const { Characteristic } = this.platform.hap;
 
     if (!device.online) {
       this.markOffline();
@@ -79,12 +80,12 @@ export class LockAccessory {
     this.controller.setFromPoll(device.lockStatus);
 
     if (device.batteryPercentage !== undefined) {
-      this.batteryService.updateCharacteristic(Characteristic.BatteryLevel, device.batteryPercentage);
+      this.batteryService.updateCharacteristic(this.C.BatteryLevel, device.batteryPercentage);
       this.batteryService.updateCharacteristic(
-        Characteristic.StatusLowBattery,
+        this.C.StatusLowBattery,
         isLowBattery(device.batteryPercentage, this.platform.lowBatteryThreshold)
-          ? Characteristic.StatusLowBattery.BATTERY_LEVEL_LOW
-          : Characteristic.StatusLowBattery.BATTERY_LEVEL_NORMAL,
+          ? this.C.StatusLowBattery.BATTERY_LEVEL_LOW
+          : this.C.StatusLowBattery.BATTERY_LEVEL_NORMAL,
       );
     }
   }
@@ -93,9 +94,8 @@ export class LockAccessory {
     if (this.offline) {
       return;
     }
-    const { Characteristic } = this.platform.hap;
-    this.lockService.updateCharacteristic(Characteristic.LockCurrentState, current as CharacteristicValue);
-    this.lockService.updateCharacteristic(Characteristic.LockTargetState, target as CharacteristicValue);
+    this.lockService.updateCharacteristic(this.C.LockCurrentState, current);
+    this.lockService.updateCharacteristic(this.C.LockTargetState, target);
   }
 
   private markOffline(): void {
@@ -103,8 +103,9 @@ export class LockAccessory {
       return;
     }
     this.offline = true;
-    const { Characteristic } = this.platform.hap;
     // Pushing an Error makes the accessory show "No Response" in the Home app.
-    this.lockService.updateCharacteristic(Characteristic.LockCurrentState, new Error('Lock offline') as unknown as CharacteristicValue);
+    // The double cast is the documented HAP idiom and lives only here.
+    const noResponse = new Error('Lock offline') as unknown as CharacteristicValue;
+    this.lockService.updateCharacteristic(this.C.LockCurrentState, noResponse);
   }
 }
