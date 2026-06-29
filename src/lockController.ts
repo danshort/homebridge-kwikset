@@ -60,7 +60,7 @@ export class LockController {
     this.current = toHomeKitCurrentState(status);
 
     if (this.pending) {
-      if (this.current === (this.pending.target as number)) {
+      if (this.reachedTarget(this.pending.target)) {
         // Confirmed: the bolt reached the requested state.
         this.target = this.pending.target;
         this.clearPending();
@@ -125,6 +125,14 @@ export class LockController {
       this.clearTimer(this.pending.handle);
       this.pending = undefined;
     }
+  }
+
+  /** Whether the current state has reached the given target (no enum cast). */
+  private reachedTarget(target: LockTargetState): boolean {
+    return (
+      (target === LockTargetState.SECURED && this.current === LockCurrentState.SECURED) ||
+      (target === LockTargetState.UNSECURED && this.current === LockCurrentState.UNSECURED)
+    );
   }
 
   private currentAsTarget(): LockTargetState {

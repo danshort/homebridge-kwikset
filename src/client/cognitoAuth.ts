@@ -15,7 +15,7 @@ import {
   IAuthenticationCallback,
 } from 'amazon-cognito-identity-js';
 
-import { CLIENT_ID, POOL_ID, customChallengeGenerateAnswer } from './constants';
+import { CLIENT_ID, CUSTOM_CHALLENGE_GENERATE_ANSWER, POOL_ID } from './constants';
 import { AuthError, ConnectionError, NeedsReauthError } from './errors';
 import { Tokens } from './types';
 
@@ -138,7 +138,7 @@ export class CognitoSrpAuthenticator implements CognitoAuthenticator {
           if (challengeRound === 1) {
             // First challenge after SRP: ask the cloud to send a code.
             try {
-              user.sendCustomChallengeAnswer(customChallengeGenerateAnswer('email'), callbacks);
+              user.sendCustomChallengeAnswer(CUSTOM_CHALLENGE_GENERATE_ANSWER, callbacks);
             } catch (err) {
               reject(mapLoginError(err));
             }

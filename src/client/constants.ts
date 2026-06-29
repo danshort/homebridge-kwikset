@@ -22,10 +22,14 @@ export const lockCommandUrl = (serialNumber: string) => `${API_BASE_URL}/devices
 export const REST_USER_AGENT = 'okhttp/5.0.0-alpha.14';
 export const ACCEPT_ENCODING = 'gzip';
 
-// --- Custom challenge (verification-code) answer template ---
-// `medium` is "email" or "phone".
-export const customChallengeGenerateAnswer = (medium: 'email' | 'phone') =>
-  `answerType:generateCode,medium:${medium},codeType:login`;
+// --- Custom challenge (verification-code) answer ---
+// Requests the cloud to send a login verification code via email.
+export const CUSTOM_CHALLENGE_GENERATE_ANSWER = 'answerType:generateCode,medium:email,codeType:login';
+
+// --- Lock command "source" identity (shows who/what operated the lock in
+// history). The cloud truncates these fields to 7 characters. ---
+export const SOURCE_NAME_MAX_LEN = 7;
+export const SOURCE_DEVICE = 'apikwik'; // "apikwikset" truncated to 7
 
 // --- Tuning ---
 export const DEFAULT_TIMEOUT_MS = 30_000;

@@ -31,6 +31,10 @@ function createPendingSessions() {
   }
 }
 
+function messageOf(err, fallback) {
+  return err && err.message ? err.message : fallback;
+}
+
 class KwiksetUiServer extends HomebridgePluginUiServer {
   constructor() {
     super();
@@ -64,7 +68,7 @@ class KwiksetUiServer extends HomebridgePluginUiServer {
       // Auth failures are mapped to safe, generic messages by cognitoAuth
       // (mapLoginError), so a credential failure never reveals whether the
       // account exists. Always 401; we never surface a distinguishing status.
-      throw new RequestError(err && err.message ? err.message : 'Login failed.', { status: 401 });
+      throw new RequestError(messageOf(err, 'Login failed.'), { status: 401 });
     }
   }
 
@@ -80,7 +84,7 @@ class KwiksetUiServer extends HomebridgePluginUiServer {
       await client.submitCode(code);
     } catch (err) {
       // Wrong/expired code: keep the session so the user can retry the code.
-      throw new RequestError(err && err.message ? err.message : 'Verification failed.', { status: 401 });
+      throw new RequestError(messageOf(err, 'Verification failed.'), { status: 401 });
     }
     this.pending.remove(sessionId);
     return { status: 'success', email: client.getEmail(), refreshToken: client.getRefreshToken() };
