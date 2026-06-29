@@ -10,7 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [18.x, 20.x]
+        # Homebridge 2.x requires Node 22+; the dev toolchain (ESLint 10 /
+        # Vitest 4) needs 20.19+. Test on current LTS lines.
+        node-version: [22.x, 24.x]
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Use Node.js ${{ matrix.node-version }}
