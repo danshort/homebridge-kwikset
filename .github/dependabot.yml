@@ -1,0 +1,29 @@
+version: 2
+
+updates:
+  # Keep the SHA-pinned GitHub Actions current (they trade away automatic tag
+  # updates, so Dependabot bumps the pins — preserving the `# vX` comment).
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+    # `ci:` keeps the PR title a valid Conventional Commit (pr-title-lint) and
+    # does not trigger a Release Please release.
+    commit-message:
+      prefix: ci
+
+  # Keep npm dependencies (runtime + dev) current.
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      npm:
+        patterns: ["*"]
+    # `chore:` so dependency bumps don't auto-cut a release; a maintainer can
+    # relabel a security-relevant bump to `fix:` if a release is wanted.
+    commit-message:
+      prefix: chore
