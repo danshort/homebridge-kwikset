@@ -14,7 +14,7 @@ It exposes each lock as a HomeKit **Lock** with **battery** reporting, so you ca
 
 ## Requirements
 
-- Homebridge v1.6+ on Node.js 18+
+- Homebridge v1.8+ or v2.x (Homebridge 2.x requires Node.js 22+)
 - [homebridge-config-ui-x](https://github.com/homebridge/homebridge-config-ui-x) (used for sign-in)
 - A Kwikset account with at least one Halo lock, already set up in the Kwikset app
 
