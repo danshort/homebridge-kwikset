@@ -25,5 +25,5 @@
 
 - [x] 5.1 Validate workflow YAML and JSON config locally (syntax + `openspec validate`); confirm versions/manifest are consistent with package.json (`0.1.1`)
 - [x] 5.2 Open this change as a Conventional-Commit-titled PR; confirm `ci.yml` and `pr-title-lint` pass on it (PR #1: build 18.x/20.x + PR Title all green)
-- [ ] 5.3 After merge, verify Release Please does NOT propose re-releasing `0.1.1` (manifest seeding correct) and that the pipeline is inert until the next `feat`/`fix` (observable only post-merge)
+- [x] 5.3 After merge, verify Release Please does NOT propose re-releasing `0.1.1` (manifest seeding correct) and that the pipeline is inert until the next `feat`/`fix` — confirmed: Release run succeeded (13s), no release PR, no new tag/release, npm still 0.1.1
 - [x] 5.4 Confirm required settings are in place so the next releasing PR can publish — npm Trusted Publisher configured (repo + `release.yml` + `release` env), Actions "create/approve PRs" permission enabled, squash-merge config applied
