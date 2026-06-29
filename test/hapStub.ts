@@ -86,7 +86,7 @@ export function fakeLog() {
 }
 
 /** A fake Homebridge `API` sufficient for KwiksetPlatform construction. */
-export function fakeApi() {
+export function fakeApi(configPath = '/nonexistent/config.json') {
   const handlers: Record<string, () => void> = {};
   return {
     hap: {
@@ -94,6 +94,7 @@ export function fakeApi() {
       Characteristic,
       uuid: { generate: (s: string) => `uuid-${s}` },
     },
+    user: { configPath: () => configPath },
     platformAccessory: FakeAccessory,
     on: (event: string, cb: () => void) => {
       handlers[event] = cb;
