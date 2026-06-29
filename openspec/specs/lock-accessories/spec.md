@@ -84,7 +84,7 @@ The platform SHALL poll device state on a configurable interval (defaulting to 3
 
 ### Requirement: Lock/unlock with optimistic state and reconciliation
 
-When the user sets the target lock state in HomeKit, the platform SHALL send the corresponding command, SHALL immediately reflect an in-progress/optimistic state, and SHALL reconcile the actual state via a follow-up read, reverting the optimistic state if the command is not confirmed within a timeout.
+When the user sets the target lock state in HomeKit, the platform SHALL send the corresponding command, SHALL immediately reflect an in-progress/optimistic state, and SHALL reconcile the actual state via a follow-up read, reverting the optimistic state if the command is not confirmed within a timeout. When commands overlap (a new target is set while a previous command is still in flight), a failure or timeout of the earlier command SHALL NOT disturb the newer command's optimistic state or its confirmation/timeout — only the command that is still current may roll itself back.
 
 #### Scenario: Unlock from HomeKit
 
@@ -100,6 +100,11 @@ When the user sets the target lock state in HomeKit, the platform SHALL send the
 
 - **WHEN** the optimistic state is not confirmed by a state read within the timeout
 - **THEN** the platform reverts to the last known actual state
+
+#### Scenario: An earlier command's failure does not disturb a newer one
+
+- **WHEN** a second target is set while the first command is still in flight, and the first command then fails or times out
+- **THEN** the second command's optimistic target, timer, and confirmation are left intact (the stale failure/timeout is ignored)
 
 ### Requirement: Reachability from connectivity
 
