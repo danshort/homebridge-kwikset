@@ -11,16 +11,16 @@ It bridges **Kwikset Halo** Wi-Fi locks into Apple HomeKit by talking to Kwikset
 The plugin runs in **two separate Node processes** that share one core module. This split is the single most important thing to understand.
 
 ```
-┌─ homebridge process ───────────────┐     ┌─ homebridge-config-ui-x process ──┐
-│  src/platform.ts  (the platform)   │     │  homebridge-ui/server.js          │
-│   • restore session from config    │     │   • email+password login          │
-│   • poll devices, map to HomeKit   │     │   • holds the code challenge      │
-│   • dispatch lock/unlock commands  │     │   • returns the refresh token     │
-│  src/lockAccessory.ts (per lock)   │     │  homebridge-ui/public/index.html  │
-│  src/lockController.ts (state m/c)  │     │   • the sign-in UI; writes the    │
-│                                    │     │     token into plugin config      │
-└───────────────┬────────────────────┘     └───────────────┬───────────────────┘
-                │            both consume the same core      │
+┌─ homebridge process ───────────────┐     ┌─ homebridge-config-ui-x process ───┐
+│  src/platform.ts  (the platform)   │     │  homebridge-ui/server.js           │
+│   • restore session from config    │     │   • email+password login           │
+│   • poll devices, map to HomeKit   │     │   • holds the code challenge       │
+│   • dispatch lock/unlock commands  │     │   • returns the refresh token      │
+│  src/lockAccessory.ts (per lock)   │     │  homebridge-ui/public/index.html   │
+│  src/lockController.ts (state m/c) │     │   • the sign-in UI; writes the     │
+│                                    │     │     token into plugin config       │
+└───────────────┬────────────────────┘     └────────────────┬───────────────────┘
+                │            both consume the same core     │
                 └──────────────┬──────────────┬─────────────┘
                                ▼              ▼
                      src/client/  (KwiksetClient + Cognito auth + REST + parsing)
