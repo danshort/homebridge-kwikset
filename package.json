@@ -1,7 +1,7 @@
 {
   "displayName": "Homebridge Kwikset",
   "name": "homebridge-kwikset",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Homebridge plugin for Kwikset Halo Wi-Fi smart locks via the Kwikset cloud API.",
   "author": "Dan Short <44993+danshort@users.noreply.github.com>",
   "license": "MIT",
